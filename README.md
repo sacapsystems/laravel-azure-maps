@@ -79,16 +79,26 @@ AZURE_MAPS_API_KEY=your-key-here
 use Sacapsystems\LaravelAzureMaps\Facades\AzureMaps;
 
 // Get coordinates for an address (default limit is 5)
-$coordinates = AzureMaps::searchAddress('123 Main Street, Cape Town');
+$coordinates = AzureMaps::searchAddress('123 Main Street, Cape Town')
+            ->get();
 
 // Get coordinates with custom limit
-$coordinates = AzureMaps::searchAddress('123 Main Street, Cape Town', 2);
+$coordinates = AzureMaps::searchAddress('123 Main Street, Cape Town')
+            ->limit(3)
+            ->get();
+
+// Search multiple countries
+$results = AzureMaps::searchAddress('123 Main Street')
+            ->country(['ZA', 'NA', 'BW'])
+            ->get();
 
 // Search for schools (default limit is 5)
 $schools = AzureMaps::searchSchools('Cape Town High School');
 
 // Search for schools with custom limit
-$schools = AzureMaps::searchSchools('Cape Town High School', 2);
+$schools = AzureMaps::searchSchools('Cape Town High School')
+            ->limit(10)
+            ->get();
 ```
 
 ## Response Format
