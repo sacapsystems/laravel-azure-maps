@@ -42,7 +42,10 @@ class QueryBuilder
         return $this;
     }
 
-    public function country(string|array $countryCode): self
+    /**
+     * @param string|array $countryCode
+     */
+    public function country($countryCode): self
     {
         $this->params['countrySet'] = is_array($countryCode)
             ? implode(',', $countryCode)
