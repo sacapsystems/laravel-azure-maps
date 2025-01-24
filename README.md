@@ -93,7 +93,8 @@ $results = AzureMaps::searchAddress('123 Main Street')
             ->get();
 
 // Search for schools (default limit is 5)
-$schools = AzureMaps::searchSchools('Cape Town High School');
+$schools = AzureMaps::searchSchools('Cape Town High School')
+            ->get();
 
 // Search for schools with custom limit
 $schools = AzureMaps::searchSchools('Cape Town High School')
