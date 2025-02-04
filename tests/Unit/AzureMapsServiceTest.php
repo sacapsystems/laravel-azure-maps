@@ -2,20 +2,48 @@
 
 namespace Sacapsystems\LaravelAzureMaps\Tests\Unit;
 
-use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Response;
 use Sacapsystems\LaravelAzureMaps\Exceptions\AzureMapsException;
 use Sacapsystems\LaravelAzureMaps\Services\AzureMapsService;
 use Sacapsystems\LaravelAzureMaps\Tests\TestCase;
+use Illuminate\Support\Facades\Config;
+use Sacapsystems\LaravelAzureMaps\Builders\QueryBuilder;
 
 class AzureMapsServiceTest extends TestCase
 {
     protected $service;
     protected $mockResponse;
+    protected $container = [];
+    protected $mockHandler;
+    protected $client;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AzureMapsService();
+
+        Config::set('azure-maps.base_url', 'https://atlas.microsoft.com/search/fuzzy/json');
+        Config::set('azure-maps.api_key', 'test-key');
+
+        // Set up Guzzle mock
+        $this->container = [];
+        $this->mockHandler = new MockHandler();
+        $handlerStack = HandlerStack::create($this->mockHandler);
+        $history = Middleware::history($this->container);
+        $handlerStack->push($history);
+        $this->client = new Client(['handler' => $handlerStack]);
+
+        // Create service with mocked query builder factory
+        $this->service = new AzureMapsService(function () {
+            return new QueryBuilder(
+                Config::get('azure-maps.base_url'),
+                Config::get('azure-maps.api_key'),
+                $this->client
+            );
+        });
         $this->mockResponse = [
            'summary' => ['numResults' => 1],
            'results' => [
@@ -45,94 +73,113 @@ class AzureMapsServiceTest extends TestCase
 
     public function testBasicAddressSearch()
     {
-        Http::fake(['*' => Http::response($this->mockResponse, 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($this->mockResponse))
+        );
 
         $result = json_decode(
             $this->service->searchAddress('123 Main Street')
-               ->get(),
+                ->get(),
             true
         );
 
         $this->assertBasicResponseStructure($result);
-        Http::assertSent(function ($request) {
-            return $request['query'] === '123 Main Street'
-               && $request['limit'] === 5;
-        });
+        $this->assertCount(1, $this->container);
+        $request = $this->container[0]['request'];
+        $query = [];
+        parse_str($request->getUri()->getQuery(), $query);
+        $this->assertEquals('123 Main Street', $query['query']);
+        $this->assertEquals(5, $query['limit']);
     }
 
     public function testAddressSearchWithCustomLimit()
     {
-        Http::fake(['*' => Http::response($this->mockResponse, 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($this->mockResponse))
+        );
 
         $result = json_decode(
             $this->service->searchAddress('123 Main Street')
-               ->limit(10)
-               ->get(),
+                ->limit(10)
+                ->get(),
             true
         );
 
-        Http::assertSent(function ($request) {
-            return $request['limit'] === 10;
-        });
+        $request = $this->container[0]['request'];
+        $query = [];
+        parse_str($request->getUri()->getQuery(), $query);
+        $this->assertEquals(10, $query['limit']);
     }
 
     public function testAddressSearchWithSingleCountry()
     {
-        Http::fake(['*' => Http::response($this->mockResponse, 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($this->mockResponse))
+        );
 
         $this->service->searchAddress('123 Main Street')
-           ->country('ZA')
-           ->get();
+            ->country('ZA')
+            ->get();
 
-        Http::assertSent(function ($request) {
-            return $request['countrySet'] === 'ZA';
-        });
+        $request = $this->container[0]['request'];
+        $query = [];
+        parse_str($request->getUri()->getQuery(), $query);
+        $this->assertEquals('ZA', $query['countrySet']);
     }
 
     public function testAddressSearchWithMultipleCountries()
     {
-        Http::fake(['*' => Http::response($this->mockResponse, 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($this->mockResponse))
+        );
 
         $this->service->searchAddress('123 Main Street')
-           ->country(['ZA', 'NA'])
-           ->get();
+            ->country(['ZA', 'NA'])
+            ->get();
 
-        Http::assertSent(function ($request) {
-            return $request['countrySet'] === 'ZA,NA';
-        });
+        $request = $this->container[0]['request'];
+        $query = [];
+        parse_str($request->getUri()->getQuery(), $query);
+        $this->assertEquals('ZA,NA', $query['countrySet']);
     }
 
     public function testAddressSearchWithLocation()
     {
-        Http::fake(['*' => Http::response($this->mockResponse, 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($this->mockResponse))
+        );
 
         $this->service->searchAddress('123 Main Street')
-           ->location(-33.925, 18.424, 5000)
-           ->get();
+            ->location(-33.925, 18.424, 5000)
+            ->get();
 
-        Http::assertSent(function ($request) {
-            return $request['lat'] === -33.925
-               && $request['lon'] === 18.424
-               && $request['radius'] === 5000;
-        });
+        $request = $this->container[0]['request'];
+        $query = [];
+        parse_str($request->getUri()->getQuery(), $query);
+        $this->assertEquals(-33.925, $query['lat']);
+        $this->assertEquals(18.424, $query['lon']);
+        $this->assertEquals(5000, $query['radius']);
     }
 
     public function testSchoolSearch()
     {
-        Http::fake(['*' => Http::response($this->mockResponse, 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($this->mockResponse))
+        );
 
         $this->service->searchSchools('Cape Town High')
-           ->limit(5)
-           ->get();
+            ->limit(5)
+            ->get();
 
-        Http::assertSent(function ($request) {
-            return $request['categorySet'] === '7372';
-        });
+        $request = $this->container[0]['request'];
+        $query = [];
+        parse_str($request->getUri()->getQuery(), $query);
+        $this->assertEquals('7372', $query['categorySet']);
     }
 
     public function testSearchWithError()
     {
-        Http::fake(['*' => Http::response([], 500)]);
+        $this->mockHandler->append(new Response(500));
 
         $this->expectException(AzureMapsException::class);
         $this->service->searchAddress('Test')->get();
@@ -140,10 +187,12 @@ class AzureMapsServiceTest extends TestCase
 
     public function testSearchWithNoResults()
     {
-        Http::fake(['*' => Http::response([
-           'summary' => ['numResults' => 0],
-           'results' => []
-        ], 200)]);
+        $this->mockHandler->append(
+            new Response(200, [], json_encode([
+                'summary' => ['numResults' => 0],
+                'results' => []
+            ]))
+        );
 
         $result = json_decode(
             $this->service->searchAddress('NonexistentAddress')->get(),
