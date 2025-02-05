@@ -2,7 +2,8 @@
 
 namespace Sacapsystems\LaravelAzureMaps\Builders;
 
-use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Sacapsystems\LaravelAzureMaps\Exceptions\AzureMapsException;
 
 class QueryBuilder
@@ -10,16 +11,18 @@ class QueryBuilder
     private array $params;
     private string $baseUrl;
     private string $apiKey;
+    private Client $client;
 
     private const DEFAULT_PARAMS = [
         'api-version' => '1.0',
         'limit' => 5
     ];
 
-    public function __construct(string $baseUrl, string $apiKey)
+    public function __construct(string $baseUrl, string $apiKey, ?Client $client = null)
     {
         $this->baseUrl = $baseUrl;
         $this->apiKey = $apiKey;
+        $this->client = $client ?? new Client();
     }
 
     public function newSearch(string $query, ?string $categorySet = null): self
@@ -63,13 +66,21 @@ class QueryBuilder
 
     public function get(): string
     {
-        $response = Http::get($this->baseUrl, $this->params);
+        try {
+            $response = $this->client->get($this->baseUrl, [
+                'query' => $this->params
+            ]);
 
-        if ($response->failed()) {
-            throw new AzureMapsException('Failed to fetch search results');
+            if ($response->getStatusCode() !== 200) {
+                throw new AzureMapsException('Failed to fetch search results');
+            }
+
+            return $this->formatResults(
+                json_decode($response->getBody()->getContents(), true)
+            );
+        } catch (GuzzleException $e) {
+            throw new AzureMapsException('Failed to fetch search results: ' . $e->getMessage());
         }
-
-        return $this->formatResults($response->json());
     }
 
     private function formatResults(array $results): string

@@ -8,13 +8,18 @@ use Sacapsystems\LaravelAzureMaps\Builders\QueryBuilder;
 class AzureMapsService
 {
     private QueryBuilder $queryBuilder;
+    private $queryBuilderFactory;
 
-    public function __construct()
+    public function __construct(?callable $queryBuilderFactory = null)
     {
-        $this->queryBuilder = new QueryBuilder(
-            Config::get('azure-maps.base_url'),
-            Config::get('azure-maps.api_key')
-        );
+        $this->queryBuilderFactory = $queryBuilderFactory ?? function () {
+            return new QueryBuilder(
+                Config::get('azure-maps.base_url'),
+                Config::get('azure-maps.api_key')
+            );
+        };
+
+        $this->queryBuilder = ($this->queryBuilderFactory)();
     }
 
     public function searchAddress(string $query): QueryBuilder
