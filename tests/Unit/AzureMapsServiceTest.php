@@ -202,6 +202,54 @@ class AzureMapsServiceTest extends TestCase
         $this->assertEmpty($result);
     }
 
+    public function testAddressFormattingWithEmptyStreetInformation()
+    {
+        $responseWithoutStreet = [
+            'summary' => ['numResults' => 1],
+            'results' => [
+                [
+                    'address' => [
+                        'municipality' => 'Cape Town',
+                        'municipalitySubdivision' => 'City Bowl',
+                        'countrySubdivision' => 'Western Cape',
+                        'countrySubdivisionCode' => 'WC',
+                        'country' => 'South Africa',
+                        'countryCodeISO3' => 'ZAF',
+                        'postalCode' => '8001',
+                    ],
+                    'position' => [
+                        'lat' => -33.925,
+                        'lon' => 18.424,
+                    ],
+                    'poi' => [
+                        'name' => 'Test Location Without Street',
+                    ],
+                ],
+            ],
+        ];
+
+        $this->mockHandler->append(
+            new Response(200, [], json_encode($responseWithoutStreet))
+        );
+
+        $result = json_decode(
+            $this->service->searchAddress('Test Location')->get(),
+            true
+        );
+
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+
+        // When street information is missing, line1 should contain municipality info
+        $this->assertEquals('City Bowl, Cape Town', $result[0]['address']['line1']);
+        // And line2 should be empty
+        $this->assertEquals('', $result[0]['address']['line2']);
+
+        // Other fields should still be populated correctly
+        $this->assertEquals('Cape Town', $result[0]['address']['city']);
+        $this->assertEquals('City Bowl', $result[0]['address']['suburb']);
+    }
+
     private function assertBasicResponseStructure($result)
     {
         $this->assertIsArray($result);
