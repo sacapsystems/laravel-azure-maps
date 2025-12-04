@@ -91,11 +91,17 @@ class QueryBuilder
             $subdivision = isset($address['municipalitySubdivision']) ? $address['municipalitySubdivision'] . ', ' : '';
             $municipality = $address['municipality'] ?? '';
             $line2 = trim($subdivision . $municipality);
+            $line1 = trim(($address['streetNumber'] ?? '') . ' ' . ($address['streetName'] ?? ''));
+
+            if (empty($line1)) {
+                $line1 = $line2;
+                $line2 = '';
+            }
 
             return [
                 'name' => $result['poi']['name'] ?? '',
                 'address' => [
-                    'line1' => trim(($address['streetNumber'] ?? '') . ' ' . ($address['streetName'] ?? '')),
+                    'line1' => $line1,
                     'line2' => $line2,
                     'suburb' => $address['municipalitySubdivision'] ?? null,
                     'city' => $address['municipality'] ?? null,
